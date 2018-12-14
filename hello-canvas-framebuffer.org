@@ -1,4 +1,4 @@
-#+PROPERTY: header-args :mkdirp yes
+g#+PROPERTY: header-args :mkdirp yes
 #+PROPERTY: header-args:lisp :results "output silent"
 #+PROPERTY: header-args:glsl :results "none"
 
@@ -68,7 +68,7 @@ can take care of that boilerplate. We just need to define a bit of information t
   (defvar *viewport-half* (vec2 (/ *viewport-width* 2) (/ *viewport-height* 2)))
 
   ;; Definition of our application
-  (defapp hello-framebuffers ()
+  (defapp hello-framebuffer ()
     ((background-texture :initform nil)
      (background-banner :initform nil))
     (:viewport-title "Hello Framebuffers")
@@ -80,7 +80,7 @@ Here we define methods to acquire and release resources upon application startup
 #+BEGIN_SRC lisp :tangle src/hello-canvas-framebuffer.lisp
   (cl:in-package :hello-canvas-framebuffer)
 
-  (defmethod configuration-flow ((this hello-framebuffers))
+  (defmethod configuration-flow ((this hello-framebuffer))
     (with-slots (background-texture background-banner) this
       (for-graphics ()
         ;; cl-bodge's banner object for blitting our texture onto the screen:
@@ -93,7 +93,7 @@ Here we define methods to acquire and release resources upon application startup
                (setf background-texture (render-background)))))))
 
 
-  (defmethod sweeping-flow ((this hello-framebuffers))
+  (defmethod sweeping-flow ((this hello-framebuffer))
     (with-slots (background-texture background-banner) this
       (for-graphics ()
         (when background-texture
@@ -116,7 +116,7 @@ and a circling circle. Yes.
       (draw-circle (vec2 x y) 100
                    :fill-paint (vec4 1 1 1 0.2))))
 
-  (defmethod draw ((this hello-framebuffers))
+  (defmethod draw ((this hello-framebuffer))
     (with-slots (background-banner background-texture) this
       ;; First, blit our background when texture is ready
       (if background-texture
@@ -131,7 +131,7 @@ For convenience, lets define functions for starting and stopping our application
   (cl:in-package :hello-canvas-framebuffer)
 
   (defun run-it ()
-    (ge.app:start 'hello-framebuffers))
+    (ge.app:start 'hello-framebuffer))
 
   (defun stop-it ()
     (ge.app:stop))
@@ -140,18 +140,4 @@ For convenience, lets define functions for starting and stopping our application
 Now we can run our example with:
 #+BEGIN_SRC lisp :eval no
 (hello-canvas-framebuffer:run-it)
-#+END_SRC
-
-
-** System
-For convenience of our users we should define a loadable system
-#+BEGIN_SRC lisp :tangle hello-canvas-framebuffer.asd :eval no
-  (asdf:defsystem :hello-canvas-framebuffer
-    :description "Example of simple framebuffer usage"
-    :author "Pavel Korolev"
-    :license "MIT"
-    :depends-on (cl-bodge/appkit cl-bodge/graphics cl-bodge/canvas cl-bodge/shading)
-    :pathname "src/"
-    :serial t
-    :components ((:file "hello-canvas-framebuffer")))
 #+END_SRC

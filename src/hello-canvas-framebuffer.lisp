@@ -32,7 +32,7 @@
 (defvar *viewport-half* (vec2 (/ *viewport-width* 2) (/ *viewport-height* 2)))
 
 ;; Definition of our application
-(defapp hello-framebuffers ()
+(defapp hello-framebuffer ()
   ((background-texture :initform nil)
    (background-banner :initform nil))
   (:viewport-title "Hello Framebuffers")
@@ -41,7 +41,7 @@
 
 (cl:in-package :hello-canvas-framebuffer)
 
-(defmethod configuration-flow ((this hello-framebuffers))
+(defmethod configuration-flow ((this hello-framebuffer))
   (with-slots (background-texture background-banner) this
     (for-graphics ()
       ;; cl-bodge's banner object for blitting our texture onto the screen:
@@ -54,7 +54,7 @@
              (setf background-texture (render-background)))))))
 
 
-(defmethod sweeping-flow ((this hello-framebuffers))
+(defmethod sweeping-flow ((this hello-framebuffer))
   (with-slots (background-texture background-banner) this
     (for-graphics ()
       (when background-texture
@@ -72,7 +72,7 @@
     (draw-circle (vec2 x y) 100
                  :fill-paint (vec4 1 1 1 0.2))))
 
-(defmethod draw ((this hello-framebuffers))
+(defmethod draw ((this hello-framebuffer))
   (with-slots (background-banner background-texture) this
     ;; First, blit our background when texture is ready
     (if background-texture
@@ -84,7 +84,7 @@
 (cl:in-package :hello-canvas-framebuffer)
 
 (defun run-it ()
-  (ge.app:start 'hello-framebuffers))
+  (ge.app:start 'hello-framebuffer))
 
 (defun stop-it ()
   (ge.app:stop))
