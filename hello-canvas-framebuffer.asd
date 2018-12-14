@@ -5,4 +5,5 @@
   :depends-on (cl-bodge/appkit cl-bodge/graphics cl-bodge/canvas cl-bodge/shading)
   :pathname "src/"
   :serial t
-  :components ((:file "hello-canvas-framebuffer")))
+  :components ((:file "hello-canvas-framebuffer")
+               (:file "hello-background-framebuffer")))
