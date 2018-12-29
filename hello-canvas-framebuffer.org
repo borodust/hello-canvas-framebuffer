@@ -70,7 +70,8 @@ can take care of that boilerplate. We just need to define a bit of information t
   ;; Definition of our application
   (defapp hello-framebuffer ()
     ((background-texture :initform nil)
-     (background-banner :initform nil))
+     (background-banner :initform nil)
+     (shared-context :initform nil))
     (:viewport-title "Hello Framebuffers")
     (:viewport-width *viewport-width*)
     (:viewport-height *viewport-height*))
@@ -81,16 +82,18 @@ Here we define methods to acquire and release resources upon application startup
   (cl:in-package :hello-canvas-framebuffer)
 
   (defmethod configuration-flow ((this hello-framebuffer))
-    (with-slots (background-texture background-banner) this
-      (for-graphics ()
-        ;; cl-bodge's banner object for blitting our texture onto the screen:
-        ;; these arguments tell it fill the whole viewport
-        (setf background-banner (make-2d-banner -1 -1 2 2))
-        ;; And here we invoke a function we defined earlier to render background scene onto a
-        ;; texture in the background thread!
-        (run (for-shared-graphics ()
-               ;; Texture with our rendered background
-               (setf background-texture (render-background)))))))
+    (with-slots (background-texture background-banner shared-context) this
+      (>> (graphics-context-assembly-flow)
+          (for-graphics (context)
+            ;; cl-bodge's banner object for blitting our texture onto the screen:
+            ;; these arguments tell it fill the whole viewport
+            (setf background-banner (make-2d-banner -1 -1 2 2)
+                  shared-context context)
+            ;; And here we invoke a function we defined earlier to render background scene onto a
+            ;; texture in the background thread!
+            (run (for-graphics :context shared-context ()
+                   ;; Texture with our rendered background
+                   (setf background-texture (render-background))))))))
 
 
   (defmethod sweeping-flow ((this hello-framebuffer))

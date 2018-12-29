@@ -22,7 +22,8 @@
 (defapp hello-framebuffers ()
   ((background-canvas :initform nil)
    (background-banner :initform nil)
-   (ping-pong-pair :initform nil))
+   (ping-pong-pair :initform nil)
+   (shared-context :initform nil))
   (:viewport-title "Hello Background Framebuffer")
   (:viewport-width *viewport-width*)
   (:viewport-height *viewport-height*))
@@ -33,13 +34,14 @@
 
 
 (defun refresh-background-in-loop (this)
-  (with-slots (ping-pong-pair background-canvas) this
-    (with-ping-pong-back (texture ping-pong-pair)
-      (render-background background-canvas texture)
-      (finish-rendering-output))
-    (ping-pong-swap ping-pong-pair)
-    (run (for-shared-graphics ()
-           (refresh-background-in-loop this)))))
+  (with-slots (ping-pong-pair background-canvas shared-context) this
+    (when (enabledp this)
+      (with-ping-pong-back (texture ping-pong-pair)
+        (render-background background-canvas texture)
+        (finish-rendering-output))
+      (ping-pong-swap ping-pong-pair)
+      (run (for-graphics :context shared-context ()
+             (refresh-background-in-loop this))))))
 
 
 (defmethod configuration-flow ((this hello-framebuffers))
@@ -47,26 +49,29 @@
                background-texture-back
                background-banner
                background-canvas
-               ping-pong-pair)
+               ping-pong-pair
+               shared-context)
       this
-    (for-graphics ()
-      (setf background-banner (make-2d-banner -1 -1 2 2))
-      (run (for-shared-graphics ()
-             (let ((front (make-empty-2d-texture *viewport-width* *viewport-height* :rgba))
-                   (back (make-empty-2d-texture *viewport-width* *viewport-height* :rgba))
-                   (canvas (make-canvas 'background *viewport-width* *viewport-height*)))
-               (render-background canvas front)
-               (finish-rendering-output)
-               (setf background-canvas canvas
-                     ping-pong-pair (make-ping-pong-pair front back)))
-             (refresh-background-in-loop this))))))
+    (>> (graphics-context-assembly-flow)
+        (for-graphics (ctx)
+          (setf background-banner (make-2d-banner -1 -1 2 2)
+                shared-context ctx)
+          (run (for-graphics :context ctx ()
+                 (let ((front (make-empty-2d-texture *viewport-width* *viewport-height* :rgba))
+                       (back (make-empty-2d-texture *viewport-width* *viewport-height* :rgba))
+                       (canvas (make-canvas 'background *viewport-width* *viewport-height*)))
+                   (render-background canvas front)
+                   (finish-rendering-output)
+                   (setf background-canvas canvas
+                         ping-pong-pair (make-ping-pong-pair front back)))
+                 (refresh-background-in-loop this)))))))
 
 
 (defmethod sweeping-flow ((this hello-framebuffers))
-  (with-slots (background-banner background-canvas ping-pong-pair) this
+  (with-slots (background-banner background-canvas ping-pong-pair shared-context) this
     (>> (for-graphics ()
           (dispose background-banner))
-        (for-shared-graphics ()
+        (for-graphics :context shared-context ()
           (loop for value in (list background-canvas
                                    (with-ping-pong-front (front ping-pong-pair) front)
                                    (with-ping-pong-back (back ping-pong-pair) back))
