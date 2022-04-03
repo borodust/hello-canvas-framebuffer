@@ -19,59 +19,72 @@
 (defvar *viewport-half* (vec2 (/ *viewport-width* 2) (/ *viewport-height* 2)))
 
 
-(defapp hello-framebuffers ()
+(defclass shared-state ()
   ((background-canvas :initform nil)
    (background-banner :initform nil)
    (ping-pong-pair :initform nil)
-   (shared-context :initform nil))
+   (shared-context :initform nil)))
+
+
+(defapp hello-framebuffers ()
+  ((shared-state :initform (mt:make-guarded-reference (make-instance 'shared-state))))
   (:viewport-title "Hello Background Framebuffer")
   (:viewport-width *viewport-width*)
   (:viewport-height *viewport-height*))
+
+
+(defmacro with-shared-state ((&rest slots) app &body body)
+  (alexandria:with-gensyms (shared-state)
+    `(mt:with-guarded-reference (,shared-state (slot-value ,app 'shared-state))
+       (with-slots (,@slots) ,shared-state
+         ,@body))))
 
 
 (defun render-background (canvas texture)
   (render texture canvas :width *viewport-width* :height *viewport-height*))
 
 
-(defun refresh-background-in-loop (this)
-  (with-slots (ping-pong-pair background-canvas shared-context) this
-    (when (enabledp this)
-      (with-ping-pong-back (texture ping-pong-pair)
-        (render-background background-canvas texture)
-        (finish-rendering-output))
-      (ping-pong-swap ping-pong-pair)
-      (run (for-graphics :context shared-context ()
-             (refresh-background-in-loop this))))))
+(defun refresh-background-in-loop (enabledp ping-pong-pair background-canvas shared-context)
+  (when (funcall enabledp)
+    (with-ping-pong-back (texture ping-pong-pair)
+      (render-background background-canvas texture)
+      (finish-rendering-output))
+    (ping-pong-swap ping-pong-pair)
+    (run (for-graphics :context shared-context ()
+           (refresh-background-in-loop enabledp ping-pong-pair background-canvas shared-context)))))
 
 
 (defmethod configuration-flow ((this hello-framebuffers))
-  (with-slots (background-texture-front
-               background-texture-back
-               background-banner
-               background-canvas
-               ping-pong-pair
-               shared-context)
-      this
+  (with-slots (shared-state) this
     (>> (graphics-context-assembly-flow)
         (for-graphics (ctx)
-          (setf background-banner (make-2d-banner -1 -1 2 2)
-                shared-context ctx)
+          (with-shared-state (background-banner shared-context) this
+            (setf background-banner (make-2d-banner -1 -1 2 2)
+                  shared-context ctx))
           (run (for-graphics :context ctx ()
                  (let ((front (make-empty-2d-texture *viewport-width* *viewport-height* :rgba))
                        (back (make-empty-2d-texture *viewport-width* *viewport-height* :rgba))
                        (canvas (make-canvas 'background *viewport-width* *viewport-height*)))
                    (render-background canvas front)
                    (finish-rendering-output)
-                   (setf background-canvas canvas
-                         ping-pong-pair (make-ping-pong-pair front back)))
-                 (refresh-background-in-loop this)))))))
+                   (with-shared-state (background-canvas ping-pong-pair shared-context) this
+                     (setf background-canvas canvas
+                           ping-pong-pair (make-ping-pong-pair front back))
+                     (refresh-background-in-loop (lambda ()
+                                                   (enabledp this))
+                                                 ping-pong-pair
+                                                 background-canvas
+                                                 shared-context)))))))))
 
 
 (defmethod sweeping-flow ((this hello-framebuffers))
-  (with-slots (background-banner background-canvas ping-pong-pair shared-context) this
-    (>> (for-graphics ()
-          (dispose background-banner))
-        (for-graphics :context shared-context ()
+  (>> (for-graphics ()
+        (with-shared-state (background-banner) this
+          (dispose background-banner)))
+      (for-graphics :context (with-shared-state (shared-context) this
+                               shared-context)
+        ()
+        (with-shared-state (background-canvas ping-pong-pair) this
           (loop for value in (list background-canvas
                                    (with-ping-pong-front (front ping-pong-pair) front)
                                    (with-ping-pong-back (back ping-pong-pair) back))
@@ -87,7 +100,9 @@
                  :fill-paint (vec4 1 1 1 0.2))))
 
 (defmethod draw ((this hello-framebuffers))
-  (with-slots (background-banner ping-pong-pair) this
+  (multiple-value-bind (background-banner ping-pong-pair)
+      (with-shared-state (background-banner ping-pong-pair) this
+        (values background-banner ping-pong-pair))
     (if ping-pong-pair
         (with-ping-pong-front (front ping-pong-pair)
           (render-banner background-banner front))
